@@ -5,7 +5,7 @@ output "kubeconfig" {
 
 output "webui_url" {
   description = "Flink Web UI URL (via port-forward)"
-  value       = "http://localhost:8081"
+  value       = "http://localhost:8084"
 }
 
 output "rest_address" {
@@ -19,7 +19,7 @@ output "verify" {
     export KUBECONFIG=${local.kubeconfig}
 
     kubectl get pods -n flink
-    kubectl port-forward -n flink svc/flink-jobmanager 8081:8081
-    curl http://localhost:8081/overview
+    kubectl port-forward -n flink svc/flink-jobmanager 8084:8081
+    curl http://localhost:8084/overview
   EOT
 }

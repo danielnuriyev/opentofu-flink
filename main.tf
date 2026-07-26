@@ -38,10 +38,10 @@ resource "null_resource" "flink" {
       trap 'if [ -n "$PF_PID" ]; then kill "$PF_PID" 2>/dev/null || true; fi' EXIT
       flink_ready=false
       for i in $(seq 1 30); do
-        kubectl --kubeconfig="${local.kubeconfig}" port-forward -n flink svc/flink-jobmanager 18081:8081 >/tmp/flink-pf.log 2>&1 &
+        kubectl --kubeconfig="${local.kubeconfig}" port-forward -n flink svc/flink-jobmanager 8084:8081 >/tmp/flink-pf.log 2>&1 &
         PF_PID=$!
         for j in $(seq 1 10); do
-          if curl -sf http://127.0.0.1:18081/overview >/dev/null; then
+          if curl -sf http://127.0.0.1:8084/overview >/dev/null; then
             echo "flink rest api ready"
             flink_ready=true
             break 2

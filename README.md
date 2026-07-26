@@ -7,7 +7,7 @@ Deploys [Apache Flink](https://flink.apache.org/) as a session cluster onto the 
 - Creates a `flink` namespace on the Kind cluster
 - Runs a Flink 2.3.0 session cluster (`apache/flink:2.3.0-java17`)
 - Deploys one JobManager and one TaskManager
-- Exposes the Flink REST/Web UI on port `8081`
+- Exposes the Flink REST/Web UI on port `8081` in-cluster (`localhost:8084` via port-forward)
 
 ## Prerequisites
 
@@ -32,8 +32,8 @@ kubectl get pods -n flink
 Open the Flink Web UI:
 
 ```bash
-kubectl port-forward -n flink svc/flink-jobmanager 8081:8081
-curl http://localhost:8081/overview
+kubectl port-forward -n flink svc/flink-jobmanager 8084:8081
+curl http://localhost:8084/overview
 ```
 
 Expected output includes `"taskmanagers":1` and Flink version `2.3.0`.
