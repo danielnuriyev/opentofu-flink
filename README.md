@@ -20,6 +20,17 @@ tofu init
 tofu apply
 ```
 
+## Flink → Iceberg → Trino
+
+Flink does not ship with the Kafka or Iceberg SQL connectors. Use [test/python/consume_flink.py](../test/python/consume_flink.py) to install the connector JARs and submit a SQL job that reads Debezium events from Kafka topic `test`, parses the MongoDB document fields, and writes to the Iceberg table `default.events` on MinIO (`s3://warehouse/`). Trino queries that table via the `iceberg` catalog.
+
+Requires [opentofu-minio](../opentofu-minio) for object storage.
+
+```bash
+cd ../test/python
+uv run consume-flink
+```
+
 ## Verify
 
 Check pods are running:

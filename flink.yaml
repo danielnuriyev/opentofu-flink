@@ -6,6 +6,40 @@ metadata:
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  name: flink-connector-init
+  namespace: flink
+  labels:
+    app: flink
+data:
+  install-connectors.sh: |
+    #!/bin/sh
+    set -eu
+    cd /opt/flink/usrlib
+    fetch() {
+      url="$1"
+      file="$2"
+      if [ ! -f "$file" ]; then
+        echo "downloading $file"
+        curl -fsSL "$url" -o "$file"
+      fi
+    }
+    fetch "https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-kafka/5.0.0-2.2/flink-sql-connector-kafka-5.0.0-2.2.jar" \
+          "flink-sql-connector-kafka-5.0.0-2.2.jar"
+    fetch "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-flink-runtime-2.1/1.11.0/iceberg-flink-runtime-2.1-1.11.0.jar" \
+          "iceberg-flink-runtime-2.1-1.11.0.jar"
+    fetch "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/1.11.0/iceberg-aws-bundle-1.11.0.jar" \
+          "iceberg-aws-bundle-1.11.0.jar"
+    fetch "https://repo1.maven.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-9.0/flink-shaded-hadoop-2-uber-2.8.3-9.0.jar" \
+          "flink-shaded-hadoop-2-uber-2.8.3-9.0.jar"
+    ls -la /opt/flink/usrlib
+  copy-to-lib.sh: |
+    #!/bin/sh
+    set -eu
+    cp /opt/flink/usrlib/*.jar /opt/flink/lib/
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
   name: flink-config
   namespace: flink
   labels:
@@ -20,6 +54,7 @@ data:
     jobmanager.memory.process.size: 1024m
     taskmanager.memory.process.size: 1024m
     parallelism.default: 1
+    env.java.opts.all: "--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED"
   log4j-console.properties: |+
     rootLogger.level = INFO
     rootLogger.appenderRef.console.ref = ConsoleAppender
@@ -72,10 +107,23 @@ spec:
         app: flink
         component: jobmanager
     spec:
+      initContainers:
+        - name: install-connectors
+          image: curlimages/curl:8.5.0
+          command: ["/bin/sh", "/scripts/install-connectors.sh"]
+          volumeMounts:
+            - name: flink-usrlib
+              mountPath: /opt/flink/usrlib
+            - name: connector-init
+              mountPath: /scripts
       containers:
         - name: jobmanager
           image: apache/flink:2.3.0-java17
-          args: ["jobmanager"]
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              /scripts/copy-to-lib.sh
+              exec /docker-entrypoint.sh jobmanager
           ports:
             - containerPort: 6123
               name: rpc
@@ -97,6 +145,10 @@ spec:
           volumeMounts:
             - name: flink-config-volume
               mountPath: /opt/flink/conf
+            - name: flink-usrlib
+              mountPath: /opt/flink/usrlib
+            - name: connector-init
+              mountPath: /scripts
           securityContext:
             runAsUser: 9999
           resources:
@@ -115,6 +167,17 @@ spec:
                 path: config.yaml
               - key: log4j-console.properties
                 path: log4j-console.properties
+        - name: flink-usrlib
+          emptyDir: {}
+        - name: connector-init
+          configMap:
+            name: flink-connector-init
+            defaultMode: 0755
+            items:
+              - key: install-connectors.sh
+                path: install-connectors.sh
+              - key: copy-to-lib.sh
+                path: copy-to-lib.sh
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -136,10 +199,23 @@ spec:
         app: flink
         component: taskmanager
     spec:
+      initContainers:
+        - name: install-connectors
+          image: curlimages/curl:8.5.0
+          command: ["/bin/sh", "/scripts/install-connectors.sh"]
+          volumeMounts:
+            - name: flink-usrlib
+              mountPath: /opt/flink/usrlib
+            - name: connector-init
+              mountPath: /scripts
       containers:
         - name: taskmanager
           image: apache/flink:2.3.0-java17
-          args: ["taskmanager"]
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              /scripts/copy-to-lib.sh
+              exec /docker-entrypoint.sh taskmanager
           ports:
             - containerPort: 6122
               name: rpc
@@ -156,6 +232,10 @@ spec:
           volumeMounts:
             - name: flink-config-volume
               mountPath: /opt/flink/conf
+            - name: flink-usrlib
+              mountPath: /opt/flink/usrlib
+            - name: connector-init
+              mountPath: /scripts
           securityContext:
             runAsUser: 9999
           resources:
@@ -174,3 +254,14 @@ spec:
                 path: config.yaml
               - key: log4j-console.properties
                 path: log4j-console.properties
+        - name: flink-usrlib
+          emptyDir: {}
+        - name: connector-init
+          configMap:
+            name: flink-connector-init
+            defaultMode: 0755
+            items:
+              - key: install-connectors.sh
+                path: install-connectors.sh
+              - key: copy-to-lib.sh
+                path: copy-to-lib.sh
