@@ -8,10 +8,14 @@ Deploys [Apache Flink](https://flink.apache.org/) as a session cluster onto the 
 - Runs a Flink 2.3.0 session cluster (`apache/flink:2.3.0-java17`)
 - Deploys one JobManager and one TaskManager
 - Exposes the Flink REST/Web UI on port `8081` in-cluster (`localhost:8084` via port-forward)
+- Exposes JobManager and TaskManager JVM/Flink JMX metrics to Prometheus via `jmx-exporter` sidecars and a `ServiceMonitor` (requires [opentofu-monitoring](../opentofu-monitoring))
 
 ## Prerequisites
 
 - Kind cluster from [opentofu-kind](https://github.com/danielnuriyev/opentofu-kind) (`../opentofu-kind/.kubeconfig` must exist)
+- [opentofu-monitoring](../opentofu-monitoring) — Prometheus Operator (ServiceMonitor CRD)
+
+Deploy monitoring before Flink if you want Prometheus scraping on first apply.
 
 ## Deploy
 

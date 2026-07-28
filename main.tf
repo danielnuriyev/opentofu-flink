@@ -28,6 +28,11 @@ resource "null_resource" "flink" {
     command = <<-EOT
       set -euo pipefail
       test -f "${local.kubeconfig}" || { echo "Kubeconfig not found. Run tofu apply in opentofu-kind first."; exit 1; }
+      kubectl --kubeconfig="${local.kubeconfig}" get namespace minio >/dev/null || { echo "MinIO namespace not found. Run tofu apply in opentofu-minio first."; exit 1; }
+      kubectl --kubeconfig="${local.kubeconfig}" get crd servicemonitors.monitoring.coreos.com >/dev/null || {
+        echo "ServiceMonitor CRD not found. Run tofu apply in opentofu-monitoring first."
+        exit 1
+      }
 
       kubectl --kubeconfig="${local.kubeconfig}" wait --for=delete namespace/flink --timeout=120s 2>/dev/null || true
       kubectl --kubeconfig="${local.kubeconfig}" apply -f "${path.module}/flink.yaml"
@@ -56,6 +61,23 @@ resource "null_resource" "flink" {
       done
       if [ "$flink_ready" != true ]; then
         echo "Flink REST API did not become ready"
+        exit 1
+      fi
+
+      flink_targets_up=false
+      for i in $(seq 1 48); do
+        if kubectl --kubeconfig="${local.kubeconfig}" exec -n monitoring \
+          prometheus-kube-prometheus-prometheus-0 -c prometheus -- \
+          wget -qO- 'http://localhost:9090/api/v1/query?query=count(up{namespace="flink"}==1)' 2>/dev/null \
+          | grep -q '"value":\[.*,"2"\]'; then
+          echo "flink prometheus targets up (2/2)"
+          flink_targets_up=true
+          break
+        fi
+        sleep 5
+      done
+      if [ "$flink_targets_up" != true ]; then
+        echo "Flink Prometheus targets did not become ready (check Prometheus targets UI)"
         exit 1
       fi
     EOT
